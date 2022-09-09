@@ -32,6 +32,42 @@ jobs:
         xcodebuild -project open-ephys-GUI.xcodeproj -scheme ALL_BUILD -configuration Release 
 #    - name: test
 #      run: cd build && ctest
+    - name: Test Codesigning
+      if: github.ref == 'refs/heads/gha-test'
+      env:
+        artifactoryApiKey: ${{ secrets.artifactoryApiKey }}
+        MACOS_CERTIFICATE: ${{ secrets.BUILD_CERTIFICATE_BASE64 }}
+        MACOS_CERTIFICATE_PWD: ${{ secrets.BUILD_CERTIFICATE_PWD }}
+        MACOS_KEYCHAIN_PWD: oedev2022
+      run: |
+        gui_ver=$(git describe --tags $(git rev-list --tags --max-count=1))
+        zipfile=open-ephys-${gui_ver}-mac-beta.zip
+        cd Build/Release
+        mkdir open-ephys
+        mv open-ephys.app/ open-ephys
+        brew install create-dmg && create-dmg \
+          --volname "Open-Ephys Installer" \
+          --volicon "open-ephys/open-ephys.app/Contents/Resources/Icon.icns" \
+          --background "open-ephys/open-ephys.app/Contents/Resources/dmg_background.png" \
+          --window-pos 300 0 \
+          --window-size 688 416 \
+          --icon-size 128 \
+          --icon "open-ephys.app" 200 190 \
+          --hide-extension "Open-Ephys.app" \
+          --app-drop-link 500 188 \
+          "Open-Ephys-Installer.dmg" \
+          "open-ephys/"
+        installer=Open_Ephys_GUI_${gui_ver}-beta.dmg
+        mv -v Open-Ephys-Installer.dmg $installer
+        echo $MACOS_CERTIFICATE | base64 --decode > certificate.p12
+        security create-keychain -p $MACOS_KEYCHAIN_PWD build.keychain
+        security default-keychain -s build.keychain
+        security unlock-keychain -p $MACOS_KEYCHAIN_PWD build.keychain
+        security import certificate.p12 -k build.keychain -P $MACOS_CERTIFICATE_PWD -T /usr/bin/codesign
+        security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k $MACOS_KEYCHAIN_PWD build.keychain
+        security find-identity -v
+        /usr/bin/codesign --force -s "Open Ephys" $installer -v
+        curl -H $user_info -T $installer "https://openephysgui.jfrog.io/artifactory/Dev-Installer/mac/$installer"
     - name: deploy_test
       if: github.ref == 'refs/heads/testing'
       env:
