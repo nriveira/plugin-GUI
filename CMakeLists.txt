@@ -1,7 +1,7 @@
 #Open Ephys GUI main build file
-cmake_minimum_required(VERSION 3.5.0)
+cmake_minimum_required(VERSION 3.15)
 
-set(GUI_VERSION 0.6.1)
+set(GUI_VERSION 0.6.2)
 
 string(REGEX MATCHALL "[0-9]+" VERSION_LIST ${GUI_VERSION})
 set(GUI_VERSION_HEX "0x")
@@ -80,7 +80,7 @@ add_executable(open-ephys
 
 
 target_include_directories(open-ephys PRIVATE ${JUCE_DIRECTORY} ${JUCE_DIRECTORY}/modules)
-target_compile_features(open-ephys PUBLIC cxx_auto_type cxx_generalized_initializers)
+target_compile_features(open-ephys PUBLIC cxx_auto_type cxx_generalized_initializers cxx_std_17)
 
 file(GLOB _bitfiles "${RESOURCES_DIRECTORY}/Bitfiles/*.bit")
 file(GLOB _xmlfiles "${RESOURCES_DIRECTORY}/Configs/*.xml")
