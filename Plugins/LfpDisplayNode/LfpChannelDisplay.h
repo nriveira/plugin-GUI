@@ -60,6 +60,15 @@ public:
 
     */
     void pxPaint();
+
+    /** Populates the lfpChannelBitmap while scrolling back in time
+
+        needs to avoid a paint(Graphics& g) mechanism here becauswe we need to clear the screen in the lfpDisplay repaint(),
+        because otherwise we cant deal with the channel overlap (need to clear a vertical section first, _then_ all channels are
+        drawn, so cant do it per channel)
+
+    */
+    void pxPaintHistory(int playhead, int rightEdge, int maxScreenBufferIndex);
                 
     /** Selects this channel*/
     void select();
@@ -157,7 +166,7 @@ public:
     float getDepth() { return depth; }
     int getGroup() { return group; }
     
-    int screenBufferIndex;
+    int ifrom, ito, ito_local, ifrom_local;
 
     bool fullredraw; // used to indicate that a full redraw is required. is set false after each full redraw
 

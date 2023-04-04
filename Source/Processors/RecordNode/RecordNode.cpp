@@ -75,10 +75,29 @@ RecordNode::RecordNode()
 
 	eventMonitor = new EventMonitor();
 
+	checkDiskSpace();
+
 }
 
 RecordNode::~RecordNode()
 {
+}
+
+void RecordNode::checkDiskSpace()
+{
+	int diskSpaceWarningThreshold = 5; //GB
+
+	File dataDir(dataDirectory);
+	int64 freeSpace = dataDir.getBytesFreeOnVolume();
+
+	float availableBytes = freeSpace / pow(2, 30); //1 GB == 2^30 bytes
+
+	if (availableBytes < diskSpaceWarningThreshold && !isRecording)
+	{
+		String msg = "Less than " + String(diskSpaceWarningThreshold) + " GB of disk space available in " + String(dataDirectory.getFullPathName());
+		msg += ". Recording may fail. Please free up space or change the recording directory.";
+		AlertWindow::showMessageBoxAsync(AlertWindow::WarningIcon, "WARNING", msg);
+	}
 }
 
 
@@ -192,6 +211,8 @@ void RecordNode::setDataDirectory(File directory)
 {
 	dataDirectory = directory;
 	newDirectoryNeeded = true;
+
+	checkDiskSpace();
 }
 
 void RecordNode::createNewDirectory()
@@ -934,7 +955,7 @@ void RecordNode::loadCustomParametersFromXml(XmlElement* xml)
     //Get saved record path
     String savedPath = xml->getStringAttribute("path");
 
-    if (!File(savedPath).exists())
+	if (savedPath == "default" || !File(savedPath).exists())
         savedPath = CoreServices::getRecordingParentDirectory().getFullPathName();
 
     setDataDirectory(File(savedPath));
@@ -970,55 +991,52 @@ void RecordNode::loadCustomParametersFromXml(XmlElement* xml)
 
     for (auto stream : dataStreams)
     {
-        int matchingIndex = findMatchingStreamParameters(stream);
-        const uint16 streamId = stream->getStreamId();
 
-        if (matchingIndex > -1)
+        if (findMatchingStreamParameters(stream) > -1)
         {
-            int savedStreamIndex = -1;
+
+			const uint16 streamId = stream->getStreamId();
 
             for (auto* subNode : xml->getChildIterator())
             {
-                if (subNode->hasTagName("STREAM"))
+                if (subNode->hasTagName("STREAM")
+					&& subNode->getStringAttribute("name") == stream->getName()
+					&& subNode->getIntAttribute("source_node_id") == stream->getSourceNodeId())
                 {
-                    savedStreamIndex++;
 
-                    if (savedStreamIndex == matchingIndex)
-                    {
-                        if (subNode->getBoolAttribute("isMainStream", false))
-                        {
-                            setMainDataStream(streamId);
-                        }
+					if (subNode->getBoolAttribute("isMainStream", false))
+					{
+						setMainDataStream(streamId);
+					}
 
-                        setSyncLine(streamId, subNode->getIntAttribute("sync_line", 0));
+					setSyncLine(streamId, subNode->getIntAttribute("sync_line", 0));
 
-                        String recordState = subNode->getStringAttribute("recording_state", "ALL");
+					String recordState = subNode->getStringAttribute("recording_state", "ALL");
 
-                        for (int ch = 0; ch < recordContinuousChannels[streamId].size(); ch++)
-                        {
-                            bool channelState;
+					for (int ch = 0; ch < recordContinuousChannels[streamId].size(); ch++)
+					{
+						bool channelState;
 
-                            if (recordState.equalsIgnoreCase("ALL"))
-                            {
-                                channelState = true;
-                            }
-                            else if (recordState.equalsIgnoreCase("NONE"))
-                            {
-                                channelState = false;
-                            }
-                            else {
-                                if (recordState.length() > ch)
-                                {
-                                    channelState = recordState.substring(ch, ch + 1) == "1" ? true : false;
-                                }
-                                else {
-                                    channelState = true;
-                                }
-                            }
+						if (recordState.equalsIgnoreCase("ALL"))
+						{
+							channelState = true;
+						}
+						else if (recordState.equalsIgnoreCase("NONE"))
+						{
+							channelState = false;
+						}
+						else {
+							if (recordState.length() > ch)
+							{
+								channelState = recordState.substring(ch, ch + 1) == "1" ? true : false;
+							}
+							else {
+								channelState = true;
+							}
+						}
 
-                            recordContinuousChannels[streamId][ch] = channelState;
-                        }
-                    }
+						recordContinuousChannels[streamId][ch] = channelState;
+					}
 
                 }
             }

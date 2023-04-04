@@ -20,8 +20,8 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 */
-#ifndef __MONOCHROMEYELLOWCOLOURSCHEME_H__
-#define __MONOCHROMEYELLOWCOLOURSCHEME_H__
+#ifndef __LIGHTBACKGROUNDCOLOURSCHEME_H__
+#define __LIGHTBACKGROUNDCOLOURSCHEME_H__
 
 #include <VisualizerWindowHeaders.h>
 
@@ -31,12 +31,12 @@
 #include "ChannelColourScheme.h"
 
 namespace LfpViewer {
-#pragma  mark - MonochromeYellowColourScheme -
-    class MonochromeYellowColourScheme : public ChannelColourScheme
+#pragma  mark - LightBackgroundColourScheme -
+    class LightBackgroundColourScheme : public ChannelColourScheme
     {
     public:
-        MonochromeYellowColourScheme();
-        virtual ~MonochromeYellowColourScheme() {}
+        LightBackgroundColourScheme();
+        virtual ~LightBackgroundColourScheme() {}
 
         virtual const Colour getColourForIndex(int index) const override;
         virtual const Colour getBackgroundColour() const override;

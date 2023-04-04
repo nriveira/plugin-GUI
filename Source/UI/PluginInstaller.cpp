@@ -23,6 +23,7 @@
 
 #include "PluginInstaller.h"
 #include <stdio.h>
+#include <filesystem>
 
 #include "../CoreServices.h"
 #include "../AccessClass.h"
@@ -481,6 +482,16 @@ void PluginInstallerComponent::run()
 
 		checkForUpdates = false;
 	}
+
+	if(updatablePlugins.size() > 0)
+	{
+		const String updatemsg = "Some of your plugins have updates available! "
+								 "Please update them to get the latest features and bug-fixes.";
+
+		AlertWindow::showMessageBoxAsync(AlertWindow::AlertIconType::InfoIcon,
+										 "Updates Available",
+										 updatemsg, "OK", this);
+	}
 }
 
 void PluginInstallerComponent::buttonClicked(Button* button)
@@ -539,9 +550,9 @@ void PluginInstallerComponent::buttonClicked(Button* button)
 				
 				int containsType = 0;
 
-				bool isSource = label.equalsIgnoreCase("source");
-				bool isFilter = label.equalsIgnoreCase("filter");
-				bool isSink = label.equalsIgnoreCase("sink");
+				bool isSource = label.containsWholeWordIgnoreCase("source");
+				bool isFilter = label.containsWholeWordIgnoreCase("filter");
+				bool isSink = label.containsWholeWordIgnoreCase("sink");
 				bool isOther = isSource ? false : (isFilter ? false : (isSink ? false : true));
 
 				if(sourceState && isSource)
@@ -879,6 +890,16 @@ PluginInfoComponent::PluginInfoComponent() : ThreadWithProgressWindow("Plugin In
 	versionMenu.setTextWhenNoChoicesAvailable("- N/A -");
 	versionMenu.addListener(this);
 
+	addChildComponent(installedVerLabel);
+	installedVerLabel.setFont(infoFontBold);
+	installedVerLabel.setColour(Label::textColourId, Colours::white);
+	installedVerLabel.setText("Installed: ", dontSendNotification);
+
+	addChildComponent(installedVerText);
+	installedVerText.setFont(infoFont);
+	installedVerText.setColour(Label::textColourId, Colours::white);
+	installedVerText.setMinimumHorizontalScale(1.0f);
+
 	addChildComponent(lastUpdatedLabel);
 	lastUpdatedLabel.setFont(infoFontBold);
 	lastUpdatedLabel.setColour(Label::textColourId, Colours::white);
@@ -945,13 +966,16 @@ void PluginInfoComponent::resized()
 	versionLabel.setBounds(10, 90, 140, 30);
 	versionMenu.setBounds(150, 90, 110, 26);
 
-	lastUpdatedLabel.setBounds(10, 120, 140, 30);
-	lastUpdatedText.setBounds(145, 120, getWidth() - 10, 30);
+	installedVerLabel.setBounds(10, versionLabel.getBottom(), 140, 30);
+	installedVerText.setBounds(145, versionLabel.getBottom(), 110, 30);
+	
+	lastUpdatedLabel.setBounds(10, installedVerLabel.getBottom(), 140, 30);
+	lastUpdatedText.setBounds(145, installedVerLabel.getBottom(), getWidth() - 10, 30);
 
-	descriptionLabel.setBounds(10, 150, 140, 30);
-	descriptionText.setBounds(145, 155, getWidth() - 150, 75);
+	descriptionLabel.setBounds(10, lastUpdatedLabel.getBottom(), 140, 30);
+	descriptionText.setBounds(145, lastUpdatedLabel.getBottom() + 5, getWidth() - 150, 75);
 
-	dependencyLabel.setBounds(10, 160 + descriptionText.getHeight(), 140, 30);
+	dependencyLabel.setBounds(10, descriptionText.getBottom() + 5, 140, 30);
 	dependencyText.setBounds(145, dependencyLabel.getY(), getWidth() - 10, 30);
 
 	downloadButton.setBounds(getWidth() - (getWidth() * 0.25) - 20, getHeight() - 60, getWidth() * 0.25, 30);
@@ -1046,6 +1070,7 @@ void PluginInfoComponent::run()
 		LOGD("Download Successfull!!");
 
 		pInfo.installedVersion = pInfo.selectedVersion;
+		installedVerText.setText(pInfo.installedVersion, dontSendNotification);
 		downloadButton.setEnabled(false);
 		downloadButton.setButtonText("Installed");
 		uninstallButton.setVisible(true);
@@ -1193,6 +1218,11 @@ void PluginInfoComponent::setPluginInfo(const SelectedPluginInfo& p, bool should
 
 		versionMenu.clear(dontSendNotification);
 
+		if(pInfo.installedVersion.isEmpty())
+			installedVerText.setText("No", dontSendNotification);
+		else
+			installedVerText.setText(pInfo.installedVersion, dontSendNotification);
+
 		if (pInfo.versions.isEmpty())
 		{
 			downloadButton.setEnabled(false);
@@ -1226,6 +1256,9 @@ void PluginInfoComponent::makeInfoVisible(bool isEnabled)
 
 	versionLabel.setVisible(isEnabled);
 	versionMenu.setVisible(isEnabled);
+
+	installedVerLabel.setVisible(isEnabled);
+	installedVerText.setVisible(isEnabled);
 
 	lastUpdatedLabel.setVisible(isEnabled);
 	lastUpdatedText.setVisible(isEnabled);
@@ -1323,6 +1356,7 @@ bool PluginInfoComponent::uninstallPlugin(const String& plugin)
 	uninstallButton.setVisible(false);
 	downloadButton.setEnabled(true);
 	downloadButton.setButtonText("Install");
+	installedVerText.setText("No", dontSendNotification);
 
 	return true;
 }
@@ -1486,23 +1520,24 @@ int PluginInfoComponent::downloadPlugin(const String& plugin, const String& vers
 		}
 	}
 
-	// copy shared files
-	Array<File> sFiles = tempDir.getChildFile("shared").findChildFiles(File::findFilesAndDirectories, false);
+	/* Copy shared files 
+	*  Uses C++17's filesystem::copy functionality to allow copying symlinks
+	*/
+	std::filesystem::path tempSharedPath = tempDir.getChildFile("shared").getFullPathName().toStdString();
+	std::filesystem::path destSharedPath = getSharedDirectory().getFullPathName().toStdString();
 
-	for(int i = 0; i < sFiles.size() ; i++)
-	{	
-		if(sFiles[i].isDirectory())
-			sFiles[i].copyDirectoryTo(getSharedDirectory().getChildFile(sFiles[i].getFileName()));
-		else
-			sFiles[i].copyFileTo(getSharedDirectory().getChildFile(sFiles[i].getFileName()));
-	}
-
-	// copy any extra files
-	Array<File> extraFiles = tempDir.findChildFiles(File::findFiles, false);
-
-	for(int j = 0; j < extraFiles.size() ; j++)
-	{	
-		extraFiles[j].copyFileTo(CoreServices::getSavedStateDirectory().getChildFile(extraFiles[j].getFileName()));
+	// Copy only if shared files exist
+	if(std::filesystem::exists(tempSharedPath))
+	{
+		const auto copyOptions = std::filesystem::copy_options::overwrite_existing
+								| std::filesystem::copy_options::recursive
+								| std::filesystem::copy_options::copy_symlinks
+								;
+		try {
+			std::filesystem::copy(tempSharedPath, destSharedPath, copyOptions);
+		} catch(std::filesystem::filesystem_error& e) {
+			LOGE("Could not copy shared files: \"", e.what(), "\"");
+		}
 	}
 
 	tempDir.deleteRecursively();

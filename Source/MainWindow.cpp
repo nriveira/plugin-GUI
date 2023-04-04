@@ -293,6 +293,11 @@ void MainWindow::saveWindowBounds()
 
 	xml->addChildElement(recentDirectories);
 
+	XmlElement* signalChainLocked = new XmlElement("SIGNALCHAIN");
+	signalChainLocked->setAttribute("locked", ui->getEditorViewport()->isSignalChainLocked());
+
+	xml->addChildElement(signalChainLocked);
+
 	String error;
 
 	if (! xml->writeTo(file))
@@ -367,6 +372,11 @@ void MainWindow::loadWindowBounds()
 				ui->setRecentlyUsedFilenames(filenames);
 
 			}
+			else if (e->hasTagName("SIGNALCHAIN"))
+			{
+				UIComponent* ui = (UIComponent*)getContentComponent();
+				ui->getEditorViewport()->lockSignalChain(e->getBoolAttribute("locked", false));
+			}
 
 		}
 
@@ -386,6 +396,12 @@ bool MainWindow::compareConfigFiles(File file1, File file2)
 	{
 		LOGD("Recovery config is invalid. Loading lastConfig.xml");
 		return true;
+	}
+
+	if (lcXml == 0 || !lcXml->hasTagName("SETTINGS"))
+	{
+		LOGD("Last config is invalid. Loading recoveryConfig.xml");
+		return false;
 	}
 
 	auto lcSig = lcXml->getChildByName("SIGNALCHAIN");

@@ -2,7 +2,7 @@
 ------------------------------------------------------------------
 
 This file is part of the Open Ephys GUI
-Copyright (C) 2013 Open Ephys
+Copyright (C) 2021 Open Ephys
 
 ------------------------------------------------------------------
 
@@ -21,21 +21,34 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 */
 
-#include "ChannelColourScheme.h"
+#include "LightBackgroundColourScheme.h"
+#include "../LfpDisplayCanvas.h"
+#include "../LfpDisplay.h"
+
+#include <math.h>
 
 using namespace LfpViewer;
 
-#pragma  mark - LfpChannelColourScheme -
+#pragma  mark - LightBackgroundColourScheme -
 
-int ChannelColourScheme::colourGrouping = 1;
+Array<Colour> LightBackgroundColourScheme::colourList = []() -> Array<Colour> {
+    Array<Colour> colours;
+    colours.add(Colour(55, 55, 55));
 
-void ChannelColourScheme::setColourGrouping(int grouping)
+    return colours;
+}();
+
+LightBackgroundColourScheme::LightBackgroundColourScheme() : ChannelColourScheme("Light Background", 1)
 {
-    colourGrouping = grouping;
 }
 
-int ChannelColourScheme::getColourGrouping()
+const Colour LightBackgroundColourScheme::getBackgroundColour() const
 {
-    return colourGrouping;
+    return Colour(191, 230, 255);
+}
+
+const Colour LightBackgroundColourScheme::getColourForIndex(int index) const
+{
+    return colourList[0];
 }
 
