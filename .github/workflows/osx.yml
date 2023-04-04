@@ -62,9 +62,9 @@ jobs:
         security unlock-keychain -p $MACOS_CI_KEYCHAIN_PWD build.keychain
         security import certificate.p12 -k build.keychain -P $MACOS_CERTIFICATE_PWD -T /usr/bin/codesign
         security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k $MACOS_CI_KEYCHAIN_PWD build.keychain
-        /usr/bin/codesign --force --deep -s "$MACOS_CERTIFICATE_NAME" --timestamp --options runtime open-ephys/open-ephys.app -v
+        /usr/bin/codesign --force -s "$MACOS_CERTIFICATE_NAME" -v open-ephys/open-ephys.app --deep --strict --timestamp --options=runtime
 
-        /usr/bin/codesign -dvvv --entitlements :- open-ephys/open-ephys.app
+        /usr/bin/codesign -dv --verbose=4 open-ephys/open-ephys.app
 
         # Store the notarization credentials so that we can prevent a UI password dialog from blocking the CI
 
@@ -76,7 +76,7 @@ jobs:
         # notarization service
 
         echo "Creating temp notarization archive"
-        /usr/bin/ditto -c -k --keepParent "open-ephys/open-ephys.app" "open-ephys.zip"
+        /usr/bin/ditto -c -k --keepParent open-ephys/open-ephys.app open-ephys.zip
 
         # Here we send the notarization request to the Apple's Notarization service, waiting for the result.
         # This typically takes a few seconds inside a CI environment, but it might take more depending on the App
@@ -89,7 +89,9 @@ jobs:
         # Finally, we need to "attach the staple" to our executable, which will allow our app to be
         # validated by macOS even when an internet connection is not available.
         echo "Attach staple"
-        xcrun stapler staple "open-ephys/open-ephys.app"
+        rm -r open-ephys/*
+        unzip open-ephys.zip -d open-ephys
+        xcrun stapler staple open-ephys/open-ephys.app
 
         zipfile=open-ephys-${gui_ver}-mac-signed.zip
         zip -r $zipfile open-ephys
